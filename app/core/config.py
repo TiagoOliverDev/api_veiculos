@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     """Configurações carregadas via variáveis de ambiente.
 
     Parâmetros:
-        DATABASE_URL (str): URL de conexão com o banco (ex.: sqlite:///./veiculos.db).
+        DATABASE_URL (str): URL de conexão com o banco (ex.: postgresql://user:pass@host/db).
         SECRET_KEY (str): Chave secreta usada para assinar tokens JWT.
         ALGORITHM (str): Algoritmo de assinatura do JWT.
         ACCESS_TOKEN_EXPIRE_MINUTES (int): Minutos até expiração do token de acesso.
@@ -19,8 +19,8 @@ class Settings(BaseSettings):
         Settings: Instância com as configurações validadas pelo Pydantic.
     """
 
-    # Database
-    DATABASE_URL: str = "sqlite:///./veiculos.db"
+    # Database (PostgreSQL em Docker por padrão)
+    DATABASE_URL: str = "postgresql://veiculo_user:senha_segura@localhost:5432/veiculos_db"
     
     # Security
     SECRET_KEY: str
