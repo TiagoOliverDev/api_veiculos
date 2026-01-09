@@ -107,7 +107,13 @@ async def create_veiculo(
         VeiculoResponse: Veículo criado com ID gerado e timestamps.
     """
     service = VeiculoService(db)
-    return service.create_veiculo(veiculo_data)
+    try:
+        return service.create_veiculo(veiculo_data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e)
+        )
 
 
 @router.put("/{id}", response_model=VeiculoResponse)
@@ -129,7 +135,13 @@ async def update_veiculo(
         VeiculoResponse: Veículo atualizado; 404 se o ID não existir.
     """
     service = VeiculoService(db)
-    veiculo = service.update_veiculo(id, veiculo_data)
+    try:
+        veiculo = service.update_veiculo(id, veiculo_data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e)
+        )
     
     if not veiculo:
         raise HTTPException(
@@ -159,7 +171,13 @@ async def patch_veiculo(
         VeiculoResponse: Veículo atualizado; 404 se não encontrado.
     """
     service = VeiculoService(db)
-    veiculo = service.patch_veiculo(id, veiculo_data)
+    try:
+        veiculo = service.patch_veiculo(id, veiculo_data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e)
+        )
     
     if not veiculo:
         raise HTTPException(
