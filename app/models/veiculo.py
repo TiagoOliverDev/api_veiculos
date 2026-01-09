@@ -8,6 +8,7 @@ class Veiculo(Base):
 
     Parâmetros/Colunas:
         id (int): Identificador único auto-incremental.
+        placa (str): Placa do veículo (única, obrigatória).
         marca (str): Marca do veículo.
         modelo (str): Modelo do veículo.
         ano (int): Ano de fabricação.
@@ -25,6 +26,7 @@ class Veiculo(Base):
     __tablename__ = "veiculos"
     
     id = Column(Integer, primary_key=True, index=True)
+    placa = Column(String(10), unique=True, nullable=False, index=True)
     marca = Column(String(50), nullable=False, index=True)
     modelo = Column(String(100), nullable=False)
     ano = Column(Integer, nullable=False, index=True)
@@ -47,6 +49,6 @@ class Veiculo(Base):
             Nenhum.
 
         Retorna:
-            str: String contendo marca, modelo e ano do veículo.
+            str: String contendo placa, marca e modelo do veículo.
         """
-        return f"<Veiculo {self.marca} {self.modelo} ({self.ano})>"
+        return f"<Veiculo {self.placa} - {self.marca} {self.modelo}>"
