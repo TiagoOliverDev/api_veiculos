@@ -3,11 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.schemas.veiculo import (
-    VeiculoCreate, 
-    VeiculoUpdate, 
-    VeiculoPatch, 
+    VeiculoCreate,
+    VeiculoUpdate,
+    VeiculoPatch,
     VeiculoResponse,
-    VeiculoFilter
+    VeiculoFilter,
+    VeiculoMarcaReport,
 )
 from app.services.veiculo_service import VeiculoService
 from app.api.dependencies import require_admin, get_current_active_user
@@ -42,6 +43,12 @@ async def get_veiculos(
     """
     service = VeiculoService(db)
     
+    if minPreco is not None and maxPreco is not None and minPreco > maxPreco:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="minPreco não pode ser maior que maxPreco"
+        )
+
     if any([marca, ano, cor, minPreco is not None, maxPreco is not None]):
         filters = VeiculoFilter(
             marca=marca,
@@ -189,3 +196,21 @@ async def delete_veiculo(
         )
     
     return None
+
+
+@router.get("/relatorios/por-marca", response_model=List[VeiculoMarcaReport])
+async def relatorio_por_marca(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Retorna contagem de veículos agrupada por marca.
+
+    Parâmetros:
+        db (Session): Sessão de banco.
+        current_user (User): Usuário autenticado e ativo.
+
+    Retorna:
+        List[VeiculoMarcaReport]: Lista com marca e quantidade.
+    """
+    service = VeiculoService(db)
+    return service.report_por_marca()
