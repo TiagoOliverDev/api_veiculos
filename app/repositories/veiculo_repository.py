@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from app.models.veiculo import Veiculo
 from app.schemas.veiculo import VeiculoCreate, VeiculoUpdate, VeiculoPatch, VeiculoFilter
 from app.repositories.base import BaseRepository
@@ -162,3 +162,27 @@ class VeiculoRepository(BaseRepository[Veiculo, VeiculoCreate, VeiculoUpdate]):
             self.db.commit()
         
         return True
+
+    def get_report_by_marca(self) -> List[dict]:
+        """Retorna quantidade de veículos agrupada por marca (exclui deletados).
+
+        Parâmetros:
+            Nenhum.
+
+        Retorna:
+            List[dict]: Cada item contém marca e quantidade.
+        """
+        rows = (
+            self.db.query(
+                self.model.marca.label("marca"),
+                func.count(self.model.id).label("quantidade")
+            )
+            .filter(self.model.is_deleted == False)
+            .group_by(self.model.marca)
+            .order_by(self.model.marca.asc())
+            .all()
+        )
+        return [
+            {"marca": row.marca, "quantidade": row.quantidade}
+            for row in rows
+        ]
