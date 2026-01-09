@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
+from sqlalchemy.exc import IntegrityError
 from app.models.veiculo import Veiculo
 from app.schemas.veiculo import VeiculoCreate, VeiculoUpdate, VeiculoPatch, VeiculoFilter
 from app.repositories.base import BaseRepository
@@ -46,6 +47,21 @@ class VeiculoRepository(BaseRepository[Veiculo, VeiculoCreate, VeiculoUpdate]):
             Optional[Veiculo]: Veículo encontrado ou None.
         """
         query = self.db.query(self.model).filter(self.model.id == id)
+        if not include_deleted:
+            query = query.filter(self.model.is_deleted == False)
+        return query.first()
+    
+    def get_by_placa(self, placa: str, include_deleted: bool = False) -> Optional[Veiculo]:
+        """Busca veículo pela placa.
+
+        Parâmetros:
+            placa (str): Placa do veículo.
+            include_deleted (bool): Inclui registros soft-deletados se True.
+
+        Retorna:
+            Optional[Veiculo]: Veículo encontrado ou None.
+        """
+        query = self.db.query(self.model).filter(self.model.placa == placa)
         if not include_deleted:
             query = query.filter(self.model.is_deleted == False)
         return query.first()
