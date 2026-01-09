@@ -98,16 +98,19 @@ copy .env.example .env
 # Defina no .env (Postgres)
 SECRET_KEY=uma-chave-segura-de-32+caracteres
 DATABASE_URL=postgresql://usuario:senha@localhost:5432/seu_banco
+REDIS_URL=redis://localhost:6379/0
+EXCHANGE_RATE_TTL=600
 
 # Opcional: arquivo dedicado de testes (SQLite)
 copy .env.example .env.test
 DATABASE_URL=sqlite:///./test.db
 SECRET_KEY=chave_apenas_para_testes
+EXCHANGE_RATE_FIXED=1.0  # evita chamadas externas nos testes
 ```
 
 Como funciona o carregamento:
 - Aplicação normal: lê `.env` (Postgres por padrão no código) e ignora `.env.test`.
-- Testes (`pytest`): `tests/conftest.py` força `TESTING=1`, então o `Settings` lê `.env.test` automaticamente e sobrescreve para SQLite.
+- Testes (`pytest`): `tests/conftest.py` força `TESTING=1`, então o `Settings` lê `.env.test` automaticamente e sobrescreve para SQLite. A taxa fixa (`EXCHANGE_RATE_FIXED`) evita chamadas HTTP externas durante os testes.
 
 ### 5. Execute a aplicação
 ```bash
@@ -140,6 +143,18 @@ A API usa **JWT (JSON Web Tokens)** para autenticação.
 - **USER**: Pode apenas visualizar veículos
 - **ADMIN**: Pode criar, atualizar e deletar veículos
 
+## 💵 Preço em USD, câmbio e cache
+- O campo `preco` é recebido em BRL e convertido para USD antes de salvar.
+- Cotação primária: `https://economia.awesomeapi.com.br/json/last/USD-BRL` (campo `bid`).
+- Fallback: `https://api.frankfurter.app/latest?from=USD&to=BRL` (campo `rates.BRL`).
+- Cache: usa Redis se `REDIS_URL` estiver configurado; caso contrário, fallback em memória. TTL configurável via `EXCHANGE_RATE_TTL`.
+- Em testes, `EXCHANGE_RATE_FIXED=1.0` evita chamadas externas.
+- Respostas retornam `preco` já em USD.
+
+## 🗑️ Soft delete
+- `DELETE /api/v1/veiculos/{id}` marca o registro como `ativo=false` e `is_deleted=true`.
+- Listagens e filtros retornam apenas veículos ativos (não deletados).
+
 ## 🛣️ Endpoints
 
 ### Autenticação
@@ -165,6 +180,10 @@ A API usa **JWT (JSON Web Tokens)** para autenticação.
 | PATCH | `/api/v1/veiculos/{id}` | Atualizar veículo (parcial) | Sim | **ADMIN** |
 | DELETE | `/api/v1/veiculos/{id}` | Deletar veículo (soft delete) | Sim | **ADMIN** |
 
+Paginação e ordenação em `/api/v1/veiculos`:
+- `page` (default 1), `pageSize` (default 10, max 100)
+- `sortBy` (created_at, updated_at, preco, ano, marca), `sortOrder` (asc|desc)
+
 ## 🧪 Testes
 
 Fluxo padrão (usa SQLite com `.env.test` automaticamente):
@@ -188,6 +207,7 @@ Observações:
 - O `conftest.py` define `TESTING=1` antes de importar a aplicação, então o `Settings` lê `.env.test` e usa SQLite (`DATABASE_URL=sqlite:///./test.db`).
 - O `get_db` é sobrescrito nos testes para apontar para o engine de teste e criar/derrubar as tabelas a cada função (`scope="function"`).
 - Em execução normal (sem `TESTING=1`), o default volta a ser Postgres; garanta que `DATABASE_URL` esteja definido no `.env` ou via variável de ambiente.
+- Para evitar chamadas externas nas suítes, mantenha `EXCHANGE_RATE_FIXED=1.0` no `.env.test`.
 
 ## 🏛️ Padrões de Design Implementados
 
