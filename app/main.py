@@ -19,9 +19,6 @@ from app.api.routes import api_router
 setup_logging(settings)
 logger = get_logger("app.main")
 
-# Create database tables (comentado pois será feito nos testes via conftest.py)
-# Base.metadata.create_all(bind=engine)
-
 logger.info("API inicializada: montando aplicação")
 
 # Initialize FastAPI app
@@ -32,6 +29,15 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Ensure database tables exist on startup (safe for Docker runtime and tests)
+@app.on_event("startup")
+async def ensure_db_tables():
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables ensured/created")
+    except Exception:
+        logger.exception("Failed to ensure database tables on startup")
 
 # Add CORS middleware
 app.add_middleware(
