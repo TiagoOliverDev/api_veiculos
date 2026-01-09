@@ -20,6 +20,14 @@ services:
     networks:
       - veiculo_network
 
+  redis:
+    image: redis:7-alpine
+    container_name: veiculos-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - veiculo_network
+
   api:
     build:
       context: .
@@ -35,6 +43,8 @@ services:
       DEBUG: ${DEBUG:-False}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FILE: logs/app.log
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      EXCHANGE_RATE_TTL: ${EXCHANGE_RATE_TTL:-600}
     ports:
       - "8000:8000"
     volumes:
