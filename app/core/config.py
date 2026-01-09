@@ -1,4 +1,10 @@
+import os
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
+
+
+# Seleciona o arquivo de ambiente dinamicamente: .env.test em cenários de teste
+ENV_FILE = ".env.test" if os.getenv("TESTING") == "1" or os.getenv("PYTEST_CURRENT_TEST") else ".env"
 
 
 class Settings(BaseSettings):
@@ -19,7 +25,7 @@ class Settings(BaseSettings):
         Settings: Instância com as configurações validadas pelo Pydantic.
     """
 
-    # Database (PostgreSQL em Docker por padrão)
+    # Database (PostgreSQL por padrão; testes sobrescrevem para SQLite via .env.test)
     DATABASE_URL: str = "postgresql://veiculo_user:senha_segura@localhost:5432/veiculos_db"
     
     # Security
@@ -36,9 +42,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FILE: str = "logs/app.log"
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = ConfigDict(env_file=ENV_FILE, case_sensitive=True)
 
 
 settings = Settings()
