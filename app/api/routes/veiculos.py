@@ -24,6 +24,10 @@ async def get_veiculos(
     cor: Optional[str] = Query(None, description="Filtrar por cor"),
     minPreco: Optional[float] = Query(None, ge=0, description="Preço mínimo"),
     maxPreco: Optional[float] = Query(None, ge=0, description="Preço máximo"),
+    page: int = Query(1, ge=1, description="Número da página"),
+    pageSize: int = Query(10, ge=1, le=100, description="Tamanho da página"),
+    sortBy: Optional[str] = Query("created_at", description="Campo de ordenação (preco, ano, marca, created_at, updated_at)"),
+    sortOrder: Optional[str] = Query("asc", description="Ordem de ordenação: asc ou desc"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -49,13 +53,17 @@ async def get_veiculos(
             detail="minPreco não pode ser maior que maxPreco"
         )
 
-    if any([marca, ano, cor, minPreco is not None, maxPreco is not None]):
+    if any([marca, ano, cor, minPreco is not None, maxPreco is not None, page, pageSize, sortBy, sortOrder]):
         filters = VeiculoFilter(
             marca=marca,
             ano=ano,
             cor=cor,
             minPreco=minPreco,
-            maxPreco=maxPreco
+            maxPreco=maxPreco,
+            page=page,
+            pageSize=pageSize,
+            sortBy=sortBy,
+            sortOrder=sortOrder
         )
         return service.search_veiculos(filters)
     
