@@ -123,6 +123,26 @@ python app/main.py
 
 A API estará disponível em: `http://localhost:8000`
 
+### (Opcional) Subir Redis para cache de câmbio
+
+```bash
+docker run --name redis -p 6379:6379 -d redis:7-alpine
+```
+
+Depois, configure no `.env`:
+
+```
+REDIS_URL=redis://localhost:6379/0
+EXCHANGE_RATE_TTL=600
+```
+
+Usando docker-compose (já incluído em `docker-compose.yml`):
+
+```bash
+docker-compose up -d --build
+```
+Isso sobe Postgres, Redis e a API. A API é configurada com `REDIS_URL=redis://redis:6379/0` no compose.
+
 ## 📚 Documentação da API
 
 Após iniciar a aplicação, acesse:
