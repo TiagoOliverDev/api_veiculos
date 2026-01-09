@@ -78,12 +78,16 @@ projeto/
 
 ## 🚀 Tecnologias Utilizadas
 
-- **FastAPI** - Framework web moderno e rápido
-- **SQLAlchemy** - ORM para Python
-- **Pydantic** - Validação de dados
-- **JWT (PyJWT)** - Autenticação baseada em tokens
-- **Pytest** - Framework de testes
+- **FastAPI 0.109.0** - Framework web moderno e rápido
+- **SQLAlchemy 2.0.25** - ORM para Python
+- **PostgreSQL 16** - Banco de dados relacional (produção)
+- **Redis 7** - Cache in-memory para cotações de câmbio
+- **Pydantic 2.x** - Validação de dados
+- **JWT (python-jose)** - Autenticação baseada em tokens
+- **bcrypt 3.2.2** - Hash de senhas
+- **Pytest 7.4.4** - Framework de testes
 - **Uvicorn** - Servidor ASGI
+- **Docker & Docker Compose** - Containerização
 
 ## 📋 Requisitos
 
@@ -117,57 +121,102 @@ pip install -r requirements.txt
 ### 4. Configure as variáveis de ambiente
 Use Postgres em desenvolvimento/produção e SQLite apenas para testes automatizados.
 
+**Arquivo `.env` (Produção/Desenvolvimento):**
 ```bash
-# Copie ou crie o arquivo principal
+# Copie o template
 copy .env.example .env
 
-# Defina no .env (Postgres)
-SECRET_KEY=uma-chave-segura-de-32+caracteres
+# Configurações obrigatórias
+SECRET_KEY=uma-chave-segura-de-32+caracteres-minimo
 DATABASE_URL=postgresql://usuario:senha@localhost:5432/seu_banco
-REDIS_URL=redis://localhost:6379/0
-EXCHANGE_RATE_TTL=600
 
-# Opcional: arquivo dedicado de testes (SQLite)
+# Redis (cache de cotação USD/BRL) - OBRIGATÓRIO para produção
+REDIS_URL=redis://localhost:6379/0
+EXCHANGE_RATE_TTL=600  # Tempo de cache em segundos (10 minutos)
+
+# Opcional: fixar taxa de câmbio (apenas dev/testes)
+# EXCHANGE_RATE_FIXED=5.0
+```
+
+**Arquivo `.env.test` (Testes Automatizados):**
+```bash
+# Copie o template
 copy .env.example .env.test
+
+# Configurações de teste
 DATABASE_URL=sqlite:///./test.db
-SECRET_KEY=chave_apenas_para_testes
-EXCHANGE_RATE_FIXED=1.0  # evita chamadas externas nos testes
+SECRET_KEY=chave_apenas_para_testes_nao_usar_em_producao
+TESTING=1
+
+# Evita chamadas externas durante testes
+EXCHANGE_RATE_FIXED=1.0
+
+# Redis opcional em testes (usa fallback em memória)
+REDIS_URL=redis://localhost:6379/1
 ```
 
 Como funciona o carregamento:
 - Aplicação normal: lê `.env` (Postgres por padrão no código) e ignora `.env.test`.
 - Testes (`pytest`): `tests/conftest.py` força `TESTING=1`, então o `Settings` lê `.env.test` automaticamente e sobrescreve para SQLite. A taxa fixa (`EXCHANGE_RATE_FIXED`) evita chamadas HTTP externas durante os testes.
 
-### 5. Execute a aplicação
+### 5b. Execute a aplicação
+
+**Desenvolvimento local (sem Docker):**
 ```bash
-# Modo desenvolvimento
+# Certifique-se de ter Postgres e Redis rodando
 python -m uvicorn app.main:app --reload
 
 # Ou execute diretamente
 python app/main.py
 ```
 
+**Produção com Docker Compose (RECOMENDADO):**
+```bash
+# Inicia todos os serviços
+docker-compose up -d --build
+
+# Ver logs
+docker-compose logs -f api
+
+# Parar serviços
+docker-compose down
+```
+
 A API estará disponível em: `http://localhost:8000`
 
-### (Opcional) Subir Redis para cache de câmbio
+### 5a. Subir Redis para cache de câmbio
 
+**Opção 1: Container Docker standalone**
 ```bash
 docker run --name redis -p 6379:6379 -d redis:7-alpine
 ```
 
-Depois, configure no `.env`:
-
-```
-REDIS_URL=redis://localhost:6379/0
-EXCHANGE_RATE_TTL=600
-```
-
-Usando docker-compose (já incluído em `docker-compose.yml`):
-
+**Opção 2: Docker Compose (RECOMENDADO)**
 ```bash
+# Sobe Postgres + Redis + API juntos
 docker-compose up -d --build
 ```
-Isso sobe Postgres, Redis e a API. A API é configurada com `REDIS_URL=redis://redis:6379/0` no compose.
+
+O `docker-compose.yml` já está configurado com:
+- **PostgreSQL 16** na porta 5432
+- **Redis 7** na porta 6379  
+- **API FastAPI** na porta 8000
+- Rede interna `veiculo_network` para comunicação entre serviços
+- Health checks para garantir disponibilidade
+
+**Por que Redis é importante?**
+- ✅ Cacheia a cotação USD/BRL por 10 minutos (configurável)
+- ✅ Reduz chamadas às APIs externas de câmbio
+- ✅ Melhora performance em operações com múltiplos veículos
+- ✅ Fallback automático para cache em memória se Redis estiver indisponível
+
+**Configuração no `.env`:**
+```env
+REDIS_URL=redis://localhost:6379/0  # Standalone
+# ou
+REDIS_URL=redis://redis:6379/0      # Docker Compose (nome do service)
+EXCHANGE_RATE_TTL=600                # 10 minutos de cache
+```
 
 ## 📚 Documentação da API
 
@@ -189,13 +238,76 @@ A API usa **JWT (JSON Web Tokens)** para autenticação.
 - **USER**: Pode apenas visualizar veículos
 - **ADMIN**: Pode criar, atualizar e deletar veículos
 
-## 💵 Preço em USD, câmbio e cache
-- O campo `preco` é recebido em BRL e convertido para USD antes de salvar.
-- Cotação primária: `https://economia.awesomeapi.com.br/json/last/USD-BRL` (campo `bid`).
-- Fallback: `https://api.frankfurter.app/latest?from=USD&to=BRL` (campo `rates.BRL`).
-- Cache: usa Redis se `REDIS_URL` estiver configurado; caso contrário, fallback em memória. TTL configurável via `EXCHANGE_RATE_TTL`.
-- Em testes, `EXCHANGE_RATE_FIXED=1.0` evita chamadas externas.
-- Respostas retornam `preco` já em USD.
+## 💵 Preço em USD, Câmbio e Cache
+
+### Como funciona a conversão de preço?
+
+1. **Entrada:** Cliente envia `preco` em **BRL** (Reais)
+2. **Conversão:** Sistema busca cotação USD/BRL em tempo real
+3. **Armazenamento:** Salva no banco de dados em **USD** (Dólar)
+4. **Resposta:** API retorna `preco` em **USD**
+
+### APIs de Câmbio (com fallback automático)
+
+| Prioridade | API | Endpoint | Campo usado |
+|------------|-----|----------|-------------|
+| **1ª** | AwesomeAPI | `https://economia.awesomeapi.com.br/json/last/USD-BRL` | `USDBRL.bid` |
+| **2ª** | Frankfurter | `https://api.frankfurter.app/latest?from=USD&to=BRL` | `rates.BRL` |
+
+Se a AwesomeAPI falhar (timeout, erro HTTP), o sistema tenta automaticamente a Frankfurter.
+
+### Sistema de Cache com Redis
+
+```
+┌─────────────┐
+│   Cliente   │
+└──────┬──────┘
+       │ POST /veiculos {preco: 100000 BRL}
+       ▼
+┌─────────────────────┐
+│  VeiculoService     │
+│  _convert_to_usd()  │
+└──────┬──────────────┘
+       │
+       ▼
+┌─────────────────────┐     Cache HIT?
+│  ExchangeService    │────────Yes────► Retorna taxa do Redis
+│  get_usd_brl_rate() │                (TTL: 10min)
+└──────┬──────────────┘
+       │ Cache MISS
+       ▼
+┌─────────────────────┐
+│  AwesomeAPI         │────Sucesso────► Salva no Redis + Retorna
+│  (Primária)         │
+└──────┬──────────────┘
+       │ Falha
+       ▼
+┌─────────────────────┐
+│  Frankfurter        │────Sucesso────► Salva no Redis + Retorna
+│  (Fallback)         │
+└──────┬──────────────┘
+       │ Falha
+       ▼
+   Exceção HTTPException 503
+```
+
+### Configurações
+
+```env
+# Redis (produção)
+REDIS_URL=redis://redis:6379/0
+EXCHANGE_RATE_TTL=600  # Cache por 10 minutos
+
+# Testes (evita chamadas externas)
+EXCHANGE_RATE_FIXED=1.0  # Taxa fixa para testes
+```
+
+### Comportamento de Fallback
+
+- ✅ **Redis disponível:** Cache funciona normalmente (rápido)
+- ⚠️ **Redis indisponível:** Usa cache em memória local (ainda funciona)
+- ⚠️ **APIs de câmbio falham:** Retorna HTTP 503 (Service Unavailable)
+- ✅ **Testes:** Usa `EXCHANGE_RATE_FIXED=1.0` (sem chamadas HTTP)
 
 ## 🗑️ Soft delete
 - `DELETE /api/v1/veiculos/{id}` marca o registro como `ativo=false` e `is_deleted=true`.
@@ -346,26 +458,101 @@ curl -X GET "http://localhost:8000/api/v1/veiculos?marca=Toyota&minPreco=100000&
   -H "Authorization: Bearer {seu_token}"
 ```
 
+## � Docker e Docker Compose
+
+### Estrutura do docker-compose.yml
+
+O projeto inclui configuração completa para rodar todos os serviços:
+
+```yaml
+services:
+  postgres:   # Banco de dados PostgreSQL 16
+  redis:      # Cache Redis 7
+  api:        # API FastAPI
+```
+
+### Comandos Úteis
+
+```bash
+# Iniciar todos os serviços
+docker-compose up -d --build
+
+# Ver logs em tempo real
+docker-compose logs -f
+
+# Ver logs apenas da API
+docker-compose logs -f api
+
+# Parar serviços
+docker-compose down
+
+# Parar e remover volumes (CUIDADO: apaga dados!)
+docker-compose down -v
+
+# Reiniciar apenas um serviço
+docker-compose restart api
+
+# Verificar status dos serviços
+docker-compose ps
+
+# Executar comando dentro do container da API
+docker-compose exec api python scripts/create_admin.py
+
+# Acessar shell do container
+docker-compose exec api bash
+```
+
+### Portas Expostas
+
+| Serviço | Porta Interna | Porta Host |
+|---------|---------------|------------|
+| API (FastAPI) | 8000 | 8000 |
+| PostgreSQL | 5432 | 5432 |
+| Redis | 6379 | 6379 |
+
+### Variáveis de Ambiente no Docker
+
+O `docker-compose.yml` injeta variáveis do arquivo `.env` automaticamente:
+- `DATABASE_URL` → Aponta para `postgres:5432` (nome do service)
+- `REDIS_URL` → Aponta para `redis://redis:6379/0`
+- `SECRET_KEY`, `EXCHANGE_RATE_TTL` → Vêm do `.env`
+
 ## 🔒 Segurança
 
-- ✅ Senhas hasheadas com bcrypt
-- ✅ JWT para autenticação stateless
-- ✅ Validação de entrada em todas as rotas
-- ✅ CORS configurável
-- ✅ Rate limiting (pode ser adicionado)
-- ✅ SQL Injection prevention (SQLAlchemy ORM)
+- ✅ Senhas hasheadas com **bcrypt 3.2.2**
+- ✅ **JWT** para autenticação stateless (python-jose)
+- ✅ Validação de entrada em todas as rotas (**Pydantic**)
+- ✅ **RBAC** (Role-Based Access Control): USER vs ADMIN
+- ✅ **CORS** configurável (middleware FastAPI)
+- ✅ **SQL Injection prevention** (SQLAlchemy ORM com parametrização)
+- ✅ **Soft delete** (dados nunca são apagados fisicamente)
+- ✅ **Logs de auditoria** em todas as requisições (middleware)
+- ✅ **Type hints** completos (validação estática com mypy)
 
 ## 🚀 Melhorias Futuras
 
-- [ ] Paginação para listagem de veículos
-- [ ] Cache com Redis
-- [ ] Rate limiting
-- [ ] Docker e Docker Compose
-- [ ] CI/CD pipeline
-- [ ] Migrations com Alembic
-- [ ] Upload de imagens de veículos
-- [ ] Logs estruturados (JSON)
-- [ ] Monitoramento e métricas
+### Já Implementado ✅
+- ✅ Paginação e ordenação em listagens
+- ✅ Cache com Redis (fallback em memória)
+- ✅ Docker e Docker Compose
+- ✅ Logs rotativos com configuração centralizada
+- ✅ Soft delete com flags `ativo` e `is_deleted`
+- ✅ Conversão de preço BRL → USD com APIs externas
+- ✅ Dual API fallback (AwesomeAPI → Frankfurter)
+- ✅ Documentação OpenAPI/Swagger completa
+- ✅ 48 testes automatizados (cobertura > 75%)
+
+### Roadmap 🗺️
+- [ ] **Rate limiting** (proteção contra abuso de API)
+- [ ] **CI/CD pipeline** (GitHub Actions / GitLab CI)
+- [ ] **Migrations com Alembic** (versionamento de schema)
+- [ ] **Upload de imagens** de veículos (S3/MinIO)
+- [ ] **Logs estruturados JSON** (melhor integração com ELK/Datadog)
+- [ ] **Monitoramento e métricas** (Prometheus + Grafana)
+- [ ] **Health checks** avançados (verificar Redis, Postgres, APIs externas)
+- [ ] **Webhooks** para notificações de eventos
+- [ ] **GraphQL** como alternativa ao REST
+- [ ] **Testes de carga** (Locust/K6)
 
 ## 📄 Licença
 
@@ -373,4 +560,4 @@ Este projeto foi desenvolvido como parte de um desafio técnico.
 
 ---
 
-**Desenvolvido com ❤️ usando FastAPI**
+**Desenvolvido usando FastAPI**
