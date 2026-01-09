@@ -7,6 +7,7 @@ class VeiculoBase(BaseModel):
     """Campos básicos compartilhados entre operações de veículo.
 
     Parâmetros:
+        placa (str): Placa do veículo (formato brasileiro ou internacional).
         marca (str): Marca do veículo.
         modelo (str): Modelo do veículo.
         ano (int): Ano de fabricação (1900-2100).
@@ -17,6 +18,7 @@ class VeiculoBase(BaseModel):
     Retorna:
         VeiculoBase: Objeto validado com os campos principais de veículo.
     """
+    placa: str = Field(..., min_length=7, max_length=10, description="Placa do veículo")
     marca: str = Field(..., min_length=1, max_length=50, description="Marca do veículo")
     modelo: str = Field(..., min_length=1, max_length=100, description="Modelo do veículo")
     ano: int = Field(..., ge=1900, le=2100, description="Ano de fabricação")
@@ -41,11 +43,12 @@ class VeiculoUpdate(BaseModel):
     """Payload para atualização completa do veículo.
 
     Parâmetros:
-        marca, modelo, ano, cor, preco, descricao: Campos obrigatórios para substituir o registro.
+        placa, marca, modelo, ano, cor, preco, descricao: Campos obrigatórios para substituir o registro.
 
     Retorna:
         VeiculoUpdate: Objeto validado para atualização total.
     """
+    placa: str = Field(..., min_length=7, max_length=10)
     marca: str = Field(..., min_length=1, max_length=50)
     modelo: str = Field(..., min_length=1, max_length=100)
     ano: int = Field(..., ge=1900, le=2100)
@@ -58,11 +61,12 @@ class VeiculoPatch(BaseModel):
     """Payload opcional para atualização parcial do veículo.
 
     Parâmetros:
-        marca, modelo, ano, cor, preco, descricao: Campos opcionais que serão aplicados se fornecidos.
+        placa, marca, modelo, ano, cor, preco, descricao: Campos opcionais que serão aplicados se fornecidos.
 
     Retorna:
         VeiculoPatch: Objeto com campos opcionais para patch.
     """
+    placa: Optional[str] = Field(None, min_length=7, max_length=10)
     marca: Optional[str] = Field(None, min_length=1, max_length=50)
     modelo: Optional[str] = Field(None, min_length=1, max_length=100)
     ano: Optional[int] = Field(None, ge=1900, le=2100)

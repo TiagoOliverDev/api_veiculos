@@ -70,9 +70,18 @@ class VeiculoService:
 
         Retorna:
             VeiculoResponse: Veículo criado.
+        
+        Raises:
+            ValueError: Se a placa já estiver cadastrada.
         """
+        # Verifica duplicidade de placa
+        existing = self.repository.get_by_placa(veiculo_data.placa)
+        if existing:
+            logger.warning("tentativa de criar veiculo com placa duplicada", extra={"placa": veiculo_data.placa})
+            raise ValueError(f"Já existe um veículo cadastrado com a placa {veiculo_data.placa}")
+        
         veiculo = self.repository.create(veiculo_data)
-        logger.info("veiculo criado", extra={"veiculo_id": veiculo.id, "marca": veiculo.marca, "modelo": veiculo.modelo})
+        logger.info("veiculo criado", extra={"veiculo_id": veiculo.id, "placa": veiculo.placa, "marca": veiculo.marca, "modelo": veiculo.modelo})
         return VeiculoResponse.model_validate(veiculo)
     
     def update_veiculo(self, veiculo_id: int, veiculo_data: VeiculoUpdate) -> Optional[VeiculoResponse]:
@@ -84,12 +93,21 @@ class VeiculoService:
 
         Retorna:
             Optional[VeiculoResponse]: Veículo atualizado ou None se não encontrado.
+        
+        Raises:
+            ValueError: Se a placa já estiver em uso por outro veículo.
         """
+        # Verifica se a nova placa já existe em outro veículo
+        existing_by_placa = self.repository.get_by_placa(veiculo_data.placa)
+        if existing_by_placa and existing_by_placa.id != veiculo_id:
+            logger.warning("tentativa de atualizar com placa duplicada", extra={"placa": veiculo_data.placa, "veiculo_id": veiculo_id})
+            raise ValueError(f"Já existe outro veículo cadastrado com a placa {veiculo_data.placa}")
+        
         veiculo = self.repository.update(veiculo_id, veiculo_data)
         if not veiculo:
             logger.warning("veiculo para atualizar nao encontrado", extra={"veiculo_id": veiculo_id})
             return None
-        logger.info("veiculo atualizado", extra={"veiculo_id": veiculo.id, "marca": veiculo.marca, "modelo": veiculo.modelo})
+        logger.info("veiculo atualizado", extra={"veiculo_id": veiculo.id, "placa": veiculo.placa, "marca": veiculo.marca, "modelo": veiculo.modelo})
         return VeiculoResponse.model_validate(veiculo)
     
     def patch_veiculo(self, veiculo_id: int, veiculo_data: VeiculoPatch) -> Optional[VeiculoResponse]:
@@ -101,7 +119,17 @@ class VeiculoService:
 
         Retorna:
             Optional[VeiculoResponse]: Veículo atualizado ou None se não encontrado.
+        
+        Raises:
+            ValueError: Se tentar atualizar placa para uma já existente.
         """
+        # Se está alterando placa, verifica duplicidade
+        if veiculo_data.placa:
+            existing_by_placa = self.repository.get_by_placa(veiculo_data.placa)
+            if existing_by_placa and existing_by_placa.id != veiculo_id:
+                logger.warning("tentativa de patch com placa duplicada", extra={"placa": veiculo_data.placa, "veiculo_id": veiculo_id})
+                raise ValueError(f"Já existe outro veículo cadastrado com a placa {veiculo_data.placa}")
+        
         veiculo = self.repository.patch(veiculo_id, veiculo_data)
         if not veiculo:
             logger.warning("veiculo para patch nao encontrado", extra={"veiculo_id": veiculo_id})
