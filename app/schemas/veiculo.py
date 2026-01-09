@@ -87,6 +87,7 @@ class VeiculoResponse(VeiculoBase):
         VeiculoResponse: Objeto serializável com informações de veículo.
     """
     id: int
+    ativo: bool
     created_at: datetime
     updated_at: datetime
     
@@ -111,6 +112,10 @@ class VeiculoFilter(BaseModel):
     cor: Optional[str] = None
     min_preco: Optional[float] = Field(None, ge=0, alias="minPreco")
     max_preco: Optional[float] = Field(None, ge=0, alias="maxPreco")
+    page: int = Field(1, ge=1, alias="page")
+    page_size: int = Field(10, ge=1, le=100, alias="pageSize")
+    sort_by: Optional[str] = Field("created_at", alias="sortBy")
+    sort_order: Optional[str] = Field("asc", alias="sortOrder")
     
     model_config = ConfigDict(populate_by_name=True)
 
