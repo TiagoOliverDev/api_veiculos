@@ -27,6 +27,11 @@ class Settings(BaseSettings):
 
     # Database (PostgreSQL por padrão; testes sobrescrevem para SQLite via .env.test)
     DATABASE_URL: str = "postgresql://veiculo_user:senha_segura@localhost:5432/veiculos_db"
+
+    # Redis / Câmbio
+    REDIS_URL: str | None = None
+    EXCHANGE_RATE_TTL: int = 600
+    EXCHANGE_RATE_FIXED: float | None = None
     
     # Security
     SECRET_KEY: str
