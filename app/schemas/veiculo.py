@@ -109,3 +109,18 @@ class VeiculoFilter(BaseModel):
     max_preco: Optional[float] = Field(None, ge=0, alias="maxPreco")
     
     model_config = ConfigDict(populate_by_name=True)
+
+
+class VeiculoMarcaReport(BaseModel):
+    """Resumo agregando quantidade de veículos por marca.
+
+    Parâmetros:
+        marca (str): Nome da marca.
+        quantidade (int): Total de veículos cadastrados para a marca.
+
+    Retorna:
+        VeiculoMarcaReport: Linha de relatório por marca.
+    """
+
+    marca: str
+    quantidade: int

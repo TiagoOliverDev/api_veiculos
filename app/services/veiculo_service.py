@@ -1,7 +1,7 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from app.repositories.veiculo_repository import VeiculoRepository
-from app.schemas.veiculo import VeiculoCreate, VeiculoUpdate, VeiculoPatch, VeiculoFilter, VeiculoResponse
+from app.schemas.veiculo import VeiculoCreate, VeiculoUpdate, VeiculoPatch, VeiculoFilter, VeiculoResponse, VeiculoMarcaReport
 from app.models.veiculo import Veiculo
 from app.core.logging_config import get_logger
 
@@ -124,3 +124,16 @@ class VeiculoService:
         else:
             logger.warning("veiculo para remover nao encontrado", extra={"veiculo_id": veiculo_id})
         return deleted
+
+    def report_por_marca(self) -> List[VeiculoMarcaReport]:
+        """Gera relatório de quantidade de veículos agrupados por marca.
+
+        Parâmetros:
+            Nenhum.
+
+        Retorna:
+            List[VeiculoMarcaReport]: Lista com marca e quantidade.
+        """
+        rows = self.repository.get_report_by_marca()
+        logger.info("relatorio por marca gerado", extra={"marcas": len(rows)})
+        return [VeiculoMarcaReport.model_validate(row) for row in rows]
