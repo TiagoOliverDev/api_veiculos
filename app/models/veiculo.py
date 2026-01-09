@@ -36,6 +36,7 @@ class Veiculo(Base):
     
     # Soft delete
     is_deleted = Column(Boolean, default=False, nullable=False)
+    ativo = Column(Boolean, default=True, nullable=False)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
