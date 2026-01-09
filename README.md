@@ -15,39 +15,65 @@ Este projeto implementa uma **Arquitetura em Camadas (Layered Architecture)** co
 ```
 projeto/
 ├── app/
+│   ├── __init__.py
+│   ├── main.py                      # Aplicação FastAPI
 │   ├── api/
-│   │   ├── routes/          # Endpoints da API
-│   │   │   ├── auth.py      # Rotas de autenticação
-│   │   │   └── veiculos.py  # Rotas de veículos
-│   │   └── dependencies.py  # Dependências (auth, authorization)
+│   │   ├── __init__.py
+│   │   ├── dependencies.py          # Dependências (auth, authorization)
+│   │   └── routes/
+│   │       ├── __init__.py
+│   │       ├── auth.py              # Rotas de autenticação
+│   │       └── veiculos.py          # Rotas de veículos
 │   ├── core/
-│   │   ├── config.py        # Configurações
-│   │   ├── database.py      # Setup do banco de dados
-│   │   ├── security.py      # JWT e criptografia
-│   │   ├── exceptions.py    # Exceções customizadas
-│   │   └── middleware.py    # Middleware customizado
+│   │   ├── __init__.py
+│   │   ├── cache.py                 # Sistema de cache Redis/memória
+│   │   ├── config.py                # Configurações e Settings
+│   │   ├── database.py              # Setup do banco de dados
+│   │   ├── exceptions.py            # Exception handlers
+│   │   ├── logging_config.py        # Configuração de logs rotativos
+│   │   ├── middleware.py            # Middleware de logging
+│   │   └── security.py              # JWT e criptografia
 │   ├── models/
-│   │   ├── user.py          # Model User (SQLAlchemy)
-│   │   └── veiculo.py       # Model Veiculo (SQLAlchemy)
-│   ├── schemas/
-│   │   ├── user.py          # Schemas Pydantic para User
-│   │   └── veiculo.py       # Schemas Pydantic para Veiculo
+│   │   ├── __init__.py
+│   │   ├── user.py                  # Model User (SQLAlchemy)
+│   │   └── veiculo.py               # Model Veiculo (SQLAlchemy)
 │   ├── repositories/
-│   │   ├── base.py          # Repository abstrato
-│   │   ├── user_repository.py
-│   │   └── veiculo_repository.py
-│   ├── services/
-│   │   ├── auth_service.py  # Lógica de autenticação
-│   │   └── veiculo_service.py # Lógica de negócio de veículos
-│   └── main.py              # Aplicação FastAPI
+│   │   ├── __init__.py
+│   │   ├── base.py                  # Repository abstrato
+│   │   ├── user_repository.py       # Repositório de usuários
+│   │   └── veiculo_repository.py    # Repositório de veículos
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   ├── user.py                  # Schemas Pydantic para User
+│   │   └── veiculo.py               # Schemas Pydantic para Veiculo
+│   └── services/
+│       ├── __init__.py
+│       ├── auth_service.py          # Lógica de autenticação
+│       ├── exchange_service.py      # Serviço de câmbio USD/BRL
+│       └── veiculo_service.py       # Lógica de negócio de veículos
+├── scripts/
+│   ├── __init__.py
+│   └── create_admin.py              # Script para criar usuário admin
 ├── tests/
-│   ├── conftest.py          # Configuração de testes
-│   ├── test_auth.py         # Testes de autenticação
-│   └── test_veiculos.py     # Testes de veículos
-├── .env.example             # Exemplo de variáveis de ambiente
+│   ├── __init__.py
+│   ├── conftest.py                  # Configuração e fixtures de testes
+│   ├── test_auth.py                 # Testes de autenticação
+│   ├── test_integration_e2e.py      # Testes de integração E2E
+│   ├── test_veiculo_controllers.py  # Testes de controllers HTTP
+│   ├── test_veiculo_repository.py   # Testes de repositório
+│   ├── test_veiculo_service.py      # Testes de service layer
+│   └── test_veiculos.py             # Testes gerais de veículos
+├── .env                             # Variáveis de ambiente (produção)
+├── .env.example                     # Template de configuração
+├── .env.test                        # Variáveis de ambiente para testes
 ├── .gitignore
-├── requirements.txt
-└── README.md
+├── ARCHITECTURE.md                  # Documentação de arquitetura
+├── ATENDIMENTO_REQUISITOS.md        # Relatório de requisitos atendidos
+├── docker-compose.yml               # Compose: Postgres + Redis + API
+├── Dockerfile                       # Imagem Docker da API
+├── pytest.ini                       # Configuração do pytest
+├── README.md                        # Documentação principal
+└── requirements.txt                 # Dependências Python
 ```
 
 ## 🚀 Tecnologias Utilizadas
