@@ -1,4 +1,7 @@
 from typing import List, Optional
+from app.services.exchange_service import get_usd_brl_rate
+from app.core.cache import RateCache
+from app.core.config import settings
 from sqlalchemy.orm import Session
 from app.repositories.veiculo_repository import VeiculoRepository
 from app.schemas.veiculo import VeiculoCreate, VeiculoUpdate, VeiculoPatch, VeiculoFilter, VeiculoResponse, VeiculoMarcaReport
@@ -21,6 +24,7 @@ class VeiculoService:
             None
         """
         self.repository = VeiculoRepository(db)
+        self.rate_cache = RateCache(settings.REDIS_URL, settings.EXCHANGE_RATE_TTL)
     
     def get_all_veiculos(self) -> List[VeiculoResponse]:
         """Lista todos os veículos não deletados.
@@ -80,7 +84,8 @@ class VeiculoService:
             logger.warning("tentativa de criar veiculo com placa duplicada", extra={"placa": veiculo_data.placa})
             raise ValueError(f"Já existe um veículo cadastrado com a placa {veiculo_data.placa}")
         
-        veiculo = self.repository.create(veiculo_data)
+        veiculo_data_converted = self._convert_preco_to_usd(veiculo_data)
+        veiculo = self.repository.create(veiculo_data_converted)
         logger.info("veiculo criado", extra={"veiculo_id": veiculo.id, "placa": veiculo.placa, "marca": veiculo.marca, "modelo": veiculo.modelo})
         return VeiculoResponse.model_validate(veiculo)
     
@@ -103,7 +108,8 @@ class VeiculoService:
             logger.warning("tentativa de atualizar com placa duplicada", extra={"placa": veiculo_data.placa, "veiculo_id": veiculo_id})
             raise ValueError(f"Já existe outro veículo cadastrado com a placa {veiculo_data.placa}")
         
-        veiculo = self.repository.update(veiculo_id, veiculo_data)
+        veiculo_data_converted = self._convert_preco_to_usd(veiculo_data)
+        veiculo = self.repository.update(veiculo_id, veiculo_data_converted)
         if not veiculo:
             logger.warning("veiculo para atualizar nao encontrado", extra={"veiculo_id": veiculo_id})
             return None
@@ -130,7 +136,8 @@ class VeiculoService:
                 logger.warning("tentativa de patch com placa duplicada", extra={"placa": veiculo_data.placa, "veiculo_id": veiculo_id})
                 raise ValueError(f"Já existe outro veículo cadastrado com a placa {veiculo_data.placa}")
         
-        veiculo = self.repository.patch(veiculo_id, veiculo_data)
+        veiculo_data_converted = self._convert_preco_to_usd(veiculo_data)
+        veiculo = self.repository.patch(veiculo_id, veiculo_data_converted)
         if not veiculo:
             logger.warning("veiculo para patch nao encontrado", extra={"veiculo_id": veiculo_id})
             return None
@@ -165,3 +172,15 @@ class VeiculoService:
         rows = self.repository.get_report_by_marca()
         logger.info("relatorio por marca gerado", extra={"marcas": len(rows)})
         return [VeiculoMarcaReport.model_validate(row) for row in rows]
+
+    def _convert_preco_to_usd(self, data):
+        """Converte preco (BRL) para USD usando taxa atual e devolve cópia do schema."""
+        if getattr(data, "preco", None) is None:
+            return data
+
+        rate_brl_per_usd = get_usd_brl_rate(self.rate_cache)
+        if rate_brl_per_usd <= 0:
+            raise ValueError("Falha ao obter cotação do dólar")
+
+        preco_usd = data.preco / rate_brl_per_usd
+        return data.model_copy(update={"preco": preco_usd})
