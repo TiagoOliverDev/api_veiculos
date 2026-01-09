@@ -19,10 +19,10 @@ from app.api.routes import api_router
 setup_logging(settings)
 logger = get_logger("app.main")
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Create database tables (comentado pois será feito nos testes via conftest.py)
+# Base.metadata.create_all(bind=engine)
 
-logger.info("API inicializada: criando tabelas e montando aplicação")
+logger.info("API inicializada: montando aplicação")
 
 # Initialize FastAPI app
 app = FastAPI(
