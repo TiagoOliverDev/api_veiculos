@@ -33,7 +33,7 @@ class VeiculoRepository(BaseRepository[Veiculo, VeiculoCreate, VeiculoUpdate]):
         """
         query = self.db.query(self.model)
         if not include_deleted:
-            query = query.filter(self.model.is_deleted == False)
+            query = query.filter(self.model.is_deleted == False, self.model.ativo == True)
         return query.all()
     
     def get_by_id(self, id: int, include_deleted: bool = False) -> Optional[Veiculo]:
@@ -48,7 +48,7 @@ class VeiculoRepository(BaseRepository[Veiculo, VeiculoCreate, VeiculoUpdate]):
         """
         query = self.db.query(self.model).filter(self.model.id == id)
         if not include_deleted:
-            query = query.filter(self.model.is_deleted == False)
+            query = query.filter(self.model.is_deleted == False, self.model.ativo == True)
         return query.first()
     
     def get_by_placa(self, placa: str, include_deleted: bool = False) -> Optional[Veiculo]:
@@ -63,35 +63,46 @@ class VeiculoRepository(BaseRepository[Veiculo, VeiculoCreate, VeiculoUpdate]):
         """
         query = self.db.query(self.model).filter(self.model.placa == placa)
         if not include_deleted:
-            query = query.filter(self.model.is_deleted == False)
+            query = query.filter(self.model.is_deleted == False, self.model.ativo == True)
         return query.first()
     
     def get_with_filters(self, filters: VeiculoFilter) -> List[Veiculo]:
-        """Aplica filtros de marca, ano, cor e faixa de preço aos veículos.
+        """Aplica filtros + paginação e ordenação."""
+        query = self.db.query(self.model).filter(self.model.is_deleted == False, self.model.ativo == True)
 
-        Parâmetros:
-            filters (VeiculoFilter): Objeto com campos opcionais para filtragem.
-
-        Retorna:
-            List[Veiculo]: Veículos que atendem aos critérios.
-        """
-        query = self.db.query(self.model).filter(self.model.is_deleted == False)
-        
         if filters.marca:
             query = query.filter(self.model.marca == filters.marca)
-        
+
         if filters.ano:
             query = query.filter(self.model.ano == filters.ano)
-        
+
         if filters.cor:
             query = query.filter(self.model.cor == filters.cor)
-        
+
         if filters.min_preco is not None:
             query = query.filter(self.model.preco >= filters.min_preco)
-        
+
         if filters.max_preco is not None:
             query = query.filter(self.model.preco <= filters.max_preco)
-        
+
+        # Ordenação
+        sort_map = {
+            "preco": self.model.preco,
+            "ano": self.model.ano,
+            "marca": self.model.marca,
+            "created_at": self.model.created_at,
+            "updated_at": self.model.updated_at,
+        }
+        sort_field = sort_map.get(filters.sort_by or "created_at", self.model.created_at)
+        if (filters.sort_order or "asc").lower() == "desc":
+            query = query.order_by(sort_field.desc())
+        else:
+            query = query.order_by(sort_field.asc())
+
+        # Paginação
+        offset = (filters.page - 1) * filters.page_size
+        query = query.offset(offset).limit(filters.page_size)
+
         return query.all()
     
     def create(self, obj_in: VeiculoCreate) -> Veiculo:
@@ -170,6 +181,7 @@ class VeiculoRepository(BaseRepository[Veiculo, VeiculoCreate, VeiculoUpdate]):
         if soft:
             # Soft delete
             db_obj.is_deleted = True
+            db_obj.ativo = False
             db_obj.deleted_at = datetime.utcnow()
             self.db.commit()
         else:
